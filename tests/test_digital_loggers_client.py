@@ -14,7 +14,7 @@ import unittest
 from contextlib import contextmanager
 from click.testing import CliRunner
 
-from digital_loggers_client import digital_loggers_client
+from digital_loggers_client import DigitalLoggers
 from digital_loggers_client import cli
 
 
@@ -22,13 +22,8 @@ from digital_loggers_client import cli
 class test_digital_loggers_client(unittest.TestCase):
 
     def setUp(self):
-        pass
-
-    def tearDown(self):
-        pass
-
-    def test_000_something(self):
-        pass
+        client = DigitalLoggers()
+        result.exit_code = 0
 
     def test_command_line_interface(self):
         runner = CliRunner()

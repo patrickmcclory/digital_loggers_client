@@ -19,7 +19,7 @@ from digital_loggers_client import cli
 
 
 
-class TestDigital_loggers_client(unittest.TestCase):
+class test_digital_loggers_client(unittest.TestCase):
 
     def setUp(self):
         pass

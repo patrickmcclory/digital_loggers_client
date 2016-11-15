@@ -1,8 +1,12 @@
 # -*- coding: utf-8 -*-
 
 import click
-from .digital_loggers_client import DigitalLoggers
-
+# handle 2/3 issues with importing 
+try:
+    from .digital_loggers_client import DigitalLoggers
+except: 
+    from digital_loggers_client import DigitalLoggers
+ 
 @click.command()
 @click.argument('port_id')
 @click.argument('action')

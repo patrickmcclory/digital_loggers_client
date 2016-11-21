@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 
 from setuptools import setup
-from tests import test_digital_loggers_client
 
 with open('README.rst') as readme_file:
     readme = readme_file.read()

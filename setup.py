@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from setuptools import setup
+from tests import test_digital_loggers_client
 
 with open('README.rst') as readme_file:
     readme = readme_file.read()
@@ -11,8 +12,9 @@ with open('HISTORY.rst') as history_file:
 
 requirements = [
     'Click>=6.0',
-    'beautifulsoup4',
-    'requests'
+    'beautifulsoup4>=4.4.1',
+    'requests>=2.9.1',
+    'configparser>=3.5.0'
     # TODO: put package requirements here
 ]
 

@@ -19,6 +19,7 @@ requirements = [
 ]
 
 test_requirements = [
+    'Click>=6.0'
     # TODO: put package test requirements here
 ]
 

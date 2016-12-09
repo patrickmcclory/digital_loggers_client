@@ -9,13 +9,15 @@ import json
 
 class DigitalLoggers():
 
-    def __init__(self, profile=None, config_file='~/.dl-power.ini'):
+    def __init__(self, profile=None, config_file='~/.dl-client.ini'):
         self.logger = logging.getLogger('digital_loggers_client.DigitalLoggers')
         self.logger.debug('Initializing DigitalLoggers client class.')
         self.config_keys = ['protocol', 'fqdn', 'user', 'password', 'port_count']
         self.config_data = {}
+        self.config_profiles = []
         self.get_config_info(profile, config_file)
         self.logger.info('DigitalLoggers client initialized.')
+        self.current_status = {}
 
     def get_config_info(self, profile=None, config_file='~/.dl-power.ini'):
         self.logger.debug('Getting config data for profile [' + profile if profile else 'NoneType' + '] in config file located at [' + config_file + ']')
@@ -27,6 +29,12 @@ class DigitalLoggers():
                 else:
                     profile = 'default'
             full_profile_name = 'profile:' + profile
+            self.config_profiles = []
+            for section in config.sections():
+                if section != 'default':
+                    section_name = section.replace('profile:','')
+                    if section_name not in self.config_profiles:
+                        self.config_profiles.append(section_name)
             if full_profile_name in config.sections():
                 for key in self.config_keys:
                     if key in list(config[full_profile_name].keys()):
@@ -42,7 +50,6 @@ class DigitalLoggers():
                 self.config_data[key] = os.getenv('DL_' + key.upper())
         self.logger.debug('Configuration data loaded [' + json.dumps(self.config_data) + '].')
         missing_keys = []
-
         # check for valid config
         for key in self.config_keys:
             if not self.config_data.get(key):
@@ -82,30 +89,24 @@ class DigitalLoggers():
     def _get_port_ids(self, default_capacity=8):
         return list(range(1,int(self.config_data.get('port_count', default_capacity))))
 
-    def _get_challenge_token(self):
-        r = requests.get(self._get_url())
-        b = BeautifulSoup(r.text, 'lxml')
-        tags = b.find_all('input', attrs={'name': 'Challenge'})
-        if not tags:
-            raise RuntimeError('Could not get challenge key for DLI endpoint login')
-        elif len(tags) == 1:
-            return tags[0].get('value')
+    def _get_status_data(self):
+        self.current_status = {}
+        request_url = self._get_url() + '/index.htm'
+        r = requests.get(request_url, auth=(self.config_data.get('user'), self.config_data.get('password')))
+        self.logger.debug('Response Code: [' + str(r.status_code) + ']')
+        if r.status_code != 200:
+            self.logger.error('Failed to get [' + request_url + ']')
+            raise RuntimeError('Failed to get [' + request_url + ']')
         else:
-            raise ReferenceError('More than one instance of a challenge key found in the login page response.')
-
-    def _login(self):
-        challenge_token = self._get_challenge_token()
-        login_password_raw = challenge_token + self.config_data.get('user') + self.config_data.get('password') + challenge_token
-        m = hashlib.md5()
-        m.update(login_password_raw.encode('utf-8'))
-        login_password = m.hexdigest()
-        l = requests.post(self._get_url() + '/login.tgi', data={'Username': self.config_data.get('user'), 'Password': login_password})
-        if l.status_code == 200:
-            security_token = l.cookies.get('DLILPC')
-            self.logger.debug('Received security token: [' + security_token + ']')
-        else:
-            raise RuntimeError('Cannot get DLILPC cookie value... Auth failed.')
-        return security_token
+            soup = BeautifulSoup(r.text, 'html.parser')
+            for line in soup.find_all(class_='item'):
+                try:
+                    port_id = int(line.find_all('td')[0].text)
+                    status = line.find_all('td')[2].text.strip('\n')
+                    self.logger.debug('Found line for port [' + str(port_id) + '] with status [' + status + ']')
+                    self.current_status[port_id] = status
+                except:
+                    self.logger.debug('Found line with no status in it')
 
     def _change_power_state(self, port_id, power_state='ON'):
         if power_state.upper() not in ['ON', 'OFF', 'CCL']:
@@ -114,15 +115,19 @@ class DigitalLoggers():
             raise RuntimeError('Port id [' + port_id + '] not in range for the device configured')
         else:
             request_url = self._get_url() + '/outlet?' + port_id + '=' + power_state.upper()
-            security_token = self._login()
-            r = requests.get(request_url, cookies={'DLILPC': security_token})
-            print('Response code: [' + str(r.status_code) + ']')
+            r = requests.get(request_url, auth=(self.config_data.get('user'), self.config_data.get('password')))
+            self.logging.debug('Response code: [' + str(r.status_code) + ']')
             if r.status_code != 200:
                 self.logger.error('Failed to perform ' + power_state + ' action on port ' + port_id)
                 return False
             else:
                 self.logger.info('Successfully changed state of port [' + port_id + '] to [' + power_state + '].')
                 return True
+
+    def set_multiple(self, state_map):
+        self.logger.info('Updating port state to the following: [' + json.dumps(state_map) + ']')
+        for key in state_map.keys():
+            self._change_power_state(key, state_map[key])
 
     def on(self, port_id):
         self.logger.info('Turning port [' + port_id+ '] on.')
@@ -135,3 +140,21 @@ class DigitalLoggers():
     def cycle(self, port_id):
         self.logger.info('Cycling port [' + port_id + '].')
         return self._change_power_state(port_id, 'CCL')
+
+    def status_port(self, port_id):
+        self.logger.info('Getting status for port [' + port_id + ']')
+        if len(self.current_status) < 1:
+            self._get_status_data()
+        return self.current_status.get(port_id)
+
+    def status_ports(self, port_ids):
+        self.logger.info('Getting status for multiple ports: [' + ','.join(port_ids) + ']')
+        ret_val = {}
+        if len(self.current_status) < 1:
+            self._get_status_data()
+        for port_id in port_ids:
+            ret_val[port_id] = self.current_status(port_id)
+        return ret_val
+
+    def status_all(self):
+        return self.status_ports(self._get_port_ids)

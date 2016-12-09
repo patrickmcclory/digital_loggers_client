@@ -22,7 +22,7 @@ test_requirements = [
 
 setup(
     name='digital_loggers_client',
-    version='0.1.0',
+    version='0.1.1',
     description="Small client library for interacting with Digital Loggers Web Power Switches",
     long_description=readme + '\n\n' + history,
     author="Patrick McClory",

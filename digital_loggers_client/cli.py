@@ -16,7 +16,7 @@ def main(port_id, action, profile, config_file):
         dl.on(port_id)
     elif action.lower() == 'off':
         dl.off(port_id)
-    elif action.lower() == 'cycle':
+    elif action.lower() in ['cycle', 'ccl', 'c']:
         dl.cycle(port_id)
     else:
         raise Exception('Action [' + action + '] not supported')
